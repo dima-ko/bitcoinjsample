@@ -84,6 +84,10 @@ public class MainActivity extends AppCompatActivity {
         List<Address> watchedAddresses = wallet.getWatchedAddresses();
         watchedAddresses.add(MY_ADDRESS);
 
+        // refresh wallet
+        _getBlockChainHeightAndProceed();
+        _loadUtxos(watchedAddresses);
+
         // send coins button
         fab = (FloatingActionButton)findViewById(R.id.fab);
         fab.setOnClickListener(new View.OnClickListener() {
@@ -92,10 +96,6 @@ public class MainActivity extends AppCompatActivity {
                 _sendCoins();
             }
         });
-
-        // refresh wallet
-        _getBlockChainHeightAndProceed();
-        _loadUtxos(watchedAddresses);
     }
 
     // Refresh wallet
@@ -148,7 +148,6 @@ public class MainActivity extends AppCompatActivity {
              [{
              "address":"mtt9qQ9x7y1avuBAPGgakFRsS7v5KmuJVg",
              "txid":"3208ffe199870f44ae7b421d4f39e4a839b12ca0e3b3f0034bc7bd004aeb5fd6",
-             "vout":0,
              "scriptPubKey":"76a914929c00fd7c4485b84362835c494d3b2194877b3a88ac",
              "amount":1.3,
              "satoshis":130000000,
