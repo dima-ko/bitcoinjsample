@@ -8,6 +8,7 @@ import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.TextView;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -55,6 +56,7 @@ public class MainActivity extends AppCompatActivity {
     private Gson gson;
     private Wallet wallet;
     private ArrayList<UTXO> utxos = new ArrayList<>();
+    private TextView balanceText;
 
 
     @Override
@@ -64,6 +66,7 @@ public class MainActivity extends AppCompatActivity {
         Toolbar toolbar = (Toolbar)findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
+        balanceText = (TextView)findViewById(R.id.balanceText);
 
         gson = new GsonBuilder().create();
         client = new OkHttpClient();
@@ -77,10 +80,11 @@ public class MainActivity extends AppCompatActivity {
         }
         wallet = Wallet.fromSeed(TestNet3Params.get(), seed);
 
+        // wallet.currentReceiveAddress() - new address
         List<Address> watchedAddresses = wallet.getWatchedAddresses();
         watchedAddresses.add(MY_ADDRESS);
 
-        // send coind button
+        // send coins button
         fab = (FloatingActionButton)findViewById(R.id.fab);
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -92,53 +96,6 @@ public class MainActivity extends AppCompatActivity {
         // refresh wallet
         _getBlockChainHeightAndProceed();
         _loadUtxos(watchedAddresses);
-    }
-
-    // Sending coins
-
-    private void _sendCoins() {
-        SendRequest sendRequest = SendRequest.to(FAUCET_ADDRESS, Coin.valueOf(130000000 - APPROXIMATE_COMMISSION));
-        sendRequest.feePerKb = Coin.valueOf(10000);
-        sendRequest.ensureMinRequiredFee = true;
-        try {
-            wallet.completeTx(sendRequest);
-        } catch (InsufficientMoneyException e) {
-            e.printStackTrace();
-            return;
-        }
-        wallet.signTransaction(sendRequest);
-        _broadcastTransaction(sendRequest);
-    }
-
-    private void _broadcastTransaction(SendRequest sendRequest) {
-        byte bytes[] = sendRequest.tx.unsafeBitcoinSerialize();
-        RequestBody body = RequestBody.create(JSON, "{\"rawtx\": \"" + bytes + "\"}");
-        Request request = new Request.Builder()
-                .method("POST", body)
-                .url("https://testnet.blockexplorer.com/api/tx/send")
-                .build();
-        // Get a handler that can be used to post to the main thread
-        client.newCall(request).enqueue(
-                new Callback() {
-                    @Override
-                    public void onFailure(Request request, IOException e) {
-                        Snackbar.make(fab, "onFailure ", Snackbar.LENGTH_LONG)
-                                .setAction("Action", null).show();
-                    }
-
-                    @Override
-                    public void onResponse(Response response) throws IOException {
-                        if (!response.isSuccessful()) {
-                            Snackbar.make(fab, "Unexpected code ", Snackbar.LENGTH_LONG)
-                                    .setAction("Action", null).show();
-                        } else {
-                            Snackbar.make(fab, "Sent ", Snackbar.LENGTH_LONG)
-                                    .setAction("Action", null).show();
-
-                        }
-                    }
-
-                });
     }
 
     // Refresh wallet
@@ -187,6 +144,18 @@ public class MainActivity extends AppCompatActivity {
 
             }
 
+            /**
+             [{
+             "address":"mtt9qQ9x7y1avuBAPGgakFRsS7v5KmuJVg",
+             "txid":"3208ffe199870f44ae7b421d4f39e4a839b12ca0e3b3f0034bc7bd004aeb5fd6",
+             "vout":0,
+             "scriptPubKey":"76a914929c00fd7c4485b84362835c494d3b2194877b3a88ac",
+             "amount":1.3,
+             "satoshis":130000000,
+             "height":1180126,
+             "confirmations":8955
+             }]
+             **/
             @Override
             public void onResponse(Response response) throws IOException {
                 String string = response.body().string();
@@ -206,7 +175,6 @@ public class MainActivity extends AppCompatActivity {
                 _setupUtxoProvider();
             }
         });
-
     }
 
     private void _setupUtxoProvider() {
@@ -227,7 +195,56 @@ public class MainActivity extends AppCompatActivity {
                 return TestNet3Params.get();
             }
         });
-        Snackbar.make(fab, "Balance: " + wallet.getBalance(), Snackbar.LENGTH_LONG).show();
+        Snackbar.make(fab, "Balance refreshed", Snackbar.LENGTH_LONG).show();
+        balanceText.setText("Balance: " + wallet.getBalance().toFriendlyString());
+    }
+
+
+    // Sending coins
+
+    private void _sendCoins() {
+        SendRequest sendRequest = SendRequest.to(FAUCET_ADDRESS, Coin.valueOf(130000000 - APPROXIMATE_COMMISSION));
+        sendRequest.feePerKb = Coin.valueOf(10000);
+        sendRequest.ensureMinRequiredFee = true;
+        try {
+            wallet.completeTx(sendRequest);
+        } catch (InsufficientMoneyException e) {
+            e.printStackTrace();
+            return;
+        }
+        wallet.signTransaction(sendRequest);
+        _broadcastTransaction(sendRequest);
+    }
+
+    private void _broadcastTransaction(SendRequest sendRequest) {
+        byte bytes[] = sendRequest.tx.unsafeBitcoinSerialize();
+        RequestBody body = RequestBody.create(JSON, "{\"rawtx\": \"" + Utils.bytesToHex(bytes) + "\"}");
+        Request request = new Request.Builder()
+                .method("POST", body)
+                .url("https://testnet.blockexplorer.com/api/tx/send")
+                .build();
+        // Get a handler that can be used to post to the main thread
+        client.newCall(request).enqueue(
+                new Callback() {
+                    @Override
+                    public void onFailure(Request request, IOException e) {
+                        Snackbar.make(fab, "onFailure ", Snackbar.LENGTH_LONG)
+                                .setAction("Action", null).show();
+                    }
+
+                    @Override
+                    public void onResponse(Response response) throws IOException {
+                        if (!response.isSuccessful()) {
+                            Snackbar.make(fab, "Unexpected code ", Snackbar.LENGTH_LONG)
+                                    .setAction("Action", null).show();
+                        } else {
+                            Snackbar.make(fab, "Sent ", Snackbar.LENGTH_LONG)
+                                    .setAction("Action", null).show();
+
+                        }
+                    }
+
+                });
     }
 
     @Override
