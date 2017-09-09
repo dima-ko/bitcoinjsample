@@ -18,13 +18,19 @@ public class UtxoResponse {
     protected String scriptPubKey;
 
     @SerializedName("ts")
-    protected int ts;
+    protected long ts;
 
     @SerializedName("confirmations")
-    protected int confirmations;
+    protected long confirmations;
+
+    @SerializedName("height")
+    protected int height;
 
     @SerializedName("vout")
-    protected int vout;
+    protected long vout;
+
+    @SerializedName("satoshis")
+    protected long satoshis;
 
     @SerializedName("amount")
     protected float amount;
@@ -41,16 +47,24 @@ public class UtxoResponse {
         return scriptPubKey;
     }
 
-    public int getTs() {
+    public long getTs() {
         return ts;
     }
 
-    public int getConfirmations() {
+    public long getConfirmations() {
         return confirmations;
     }
 
-    public int getVout() {
+    public long getVout() {
         return vout;
+    }
+
+    public int getHeight() {
+        return height;
+    }
+
+    public long getSatoshis() {
+        return satoshis;
     }
 
     public float getAmount() {
