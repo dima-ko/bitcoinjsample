@@ -10,6 +10,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.TextView;
 
+import com.google.common.collect.ImmutableList;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.squareup.okhttp.Callback;
@@ -21,14 +22,17 @@ import com.squareup.okhttp.Response;
 
 import org.bitcoinj.core.Address;
 import org.bitcoinj.core.Coin;
+import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.InsufficientMoneyException;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.core.Sha256Hash;
+import org.bitcoinj.core.Transaction;
 import org.bitcoinj.core.UTXO;
 import org.bitcoinj.core.UTXOProvider;
 import org.bitcoinj.core.UTXOProviderException;
 import org.bitcoinj.params.TestNet3Params;
 import org.bitcoinj.script.Script;
+import org.bitcoinj.script.ScriptBuilder;
 import org.bitcoinj.wallet.DeterministicSeed;
 import org.bitcoinj.wallet.SendRequest;
 import org.bitcoinj.wallet.UnreadableWalletException;
@@ -71,6 +75,8 @@ public class MainActivity extends AppCompatActivity {
         gson = new GsonBuilder().create();
         client = new OkHttpClient();
 
+//        ECKey keyA = new ECKey();
+
         DeterministicSeed seed;
         try {
             seed = new DeterministicSeed(SEED, null, "", 0);
@@ -85,17 +91,17 @@ public class MainActivity extends AppCompatActivity {
         watchedAddresses.add(MY_ADDRESS);
 
         // refresh wallet
-        _getBlockChainHeightAndProceed();
-        _loadUtxos(watchedAddresses);
+//        _getBlockChainHeightAndProceed();
+//        _loadUtxos(watchedAddresses);
 
         // send coins button
-        fab = (FloatingActionButton)findViewById(R.id.fab);
-        fab.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                _sendCoins();
-            }
-        });
+//        fab = (FloatingActionButton)findViewById(R.id.fab);
+//        fab.setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View view) {
+//                _sendCoins();
+//            }
+//        });
     }
 
     // Refresh wallet
@@ -244,6 +250,29 @@ public class MainActivity extends AppCompatActivity {
                     }
 
                 });
+    }
+
+
+    // Multisig (escrow)
+
+    public void testMultiSig() {
+        ECKey keyA = new ECKey();
+        ECKey keyB = new ECKey();
+        ECKey keyC = new ECKey();
+
+        Transaction aTransaction = new Transaction(TestNet3Params.get());
+        List<ECKey> keyList = ImmutableList.of(keyA, keyB, keyC);
+        Script script = ScriptBuilder.createMultiSigOutputScript(2, keyList); //2 of 3 multisig
+
+        Coin value = Coin.valueOf(0, 10); // 0.1 btc
+        aTransaction.addOutput(value, script);
+        SendRequest request = SendRequest.forTx(aTransaction);
+        try {
+            wallet.completeTx(request); // fill in coins
+        } catch (InsufficientMoneyException e) {
+            e.printStackTrace();
+        }
+
     }
 
     @Override
