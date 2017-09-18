@@ -1,7 +1,5 @@
 package com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.model;
 
-import android.support.design.widget.Snackbar;
-
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.Utils;
@@ -196,6 +194,9 @@ public enum WalletService {
             @Override
             public void onResponse(Response response) throws IOException {
                 EventBus.getDefault().post(new SendCoinsEvent(response.isSuccessful(), response, null));
+                if (response.isSuccessful()) {
+//                    wallet.saveToFile();
+                }
             }
 
         };

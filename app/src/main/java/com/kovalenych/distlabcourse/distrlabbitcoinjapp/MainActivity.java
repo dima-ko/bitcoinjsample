@@ -1,5 +1,6 @@
 package com.kovalenych.distlabcourse.distrlabbitcoinjapp;
 
+import android.app.Dialog;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
@@ -13,6 +14,7 @@ import android.view.View;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.events.SendCoinsEvent;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.events.WalletUpdatedEvent;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.model.WalletService;
+import com.kovalenych.distlabcourse.distrlabbitcoinjapp.ui.ReceiveDialog;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.ui.TransactionAdapter;
 
 import org.bitcoinj.wallet.Wallet;
@@ -60,7 +62,8 @@ public class MainActivity extends AppCompatActivity {
         receiveFab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                WalletService.INST.sendCoins();
+                Dialog receiveDialog = new ReceiveDialog(MainActivity.this);
+                receiveDialog.show();
             }
         });
     }
