@@ -1,4 +1,4 @@
-package com.kovalenych.distlabcourse.distrlabbitcoinjapp;
+package com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.entity;
 
 import com.google.gson.annotations.SerializedName;
 
