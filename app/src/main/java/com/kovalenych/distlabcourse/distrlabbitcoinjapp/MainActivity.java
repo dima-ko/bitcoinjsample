@@ -4,6 +4,7 @@ import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -12,7 +13,9 @@ import android.view.View;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.events.SendCoinsEvent;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.events.WalletUpdatedEvent;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.model.WalletService;
+import com.kovalenych.distlabcourse.distrlabbitcoinjapp.ui.TransactionAdapter;
 
+import org.bitcoinj.wallet.Wallet;
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
@@ -22,6 +25,8 @@ public class MainActivity extends AppCompatActivity {
 
     private FloatingActionButton sendFab;
     private FloatingActionButton receiveFab;
+    private RecyclerView transactionsRecyclerView;
+    private TransactionAdapter adapter = new TransactionAdapter();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -29,9 +34,19 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         Toolbar toolbar = (Toolbar)findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-        getActionBar().setTitle("loading balance...");
-
+        getSupportActionBar().setTitle("loading balance...");
+        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        toolbar.setNavigationIcon(R.drawable.btc_icon);
         WalletService.INST.start();
+
+        _initViews();
+    }
+
+    private void _initViews() {
+
+        transactionsRecyclerView = (RecyclerView)findViewById(R.id.transactionsRecyclerView);
+
+        transactionsRecyclerView.setAdapter(adapter);
 
         sendFab = (FloatingActionButton)findViewById(R.id.sendFab);
         sendFab.setOnClickListener(new View.OnClickListener() {
@@ -55,10 +70,10 @@ public class MainActivity extends AppCompatActivity {
         Snackbar.make(sendFab, event.isSuccess() ? "Sent " : "Error", Snackbar.LENGTH_LONG).setAction("Details", null).show();
     }
 
-
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onWalletUpdatedEvent(WalletUpdatedEvent event) {
-        getActionBar().setTitle(WalletService.INST.getWallet().getBalance().toFriendlyString());
+        Wallet wallet = WalletService.INST.getWallet();
+        getSupportActionBar().setTitle(wallet.getBalance().toFriendlyString());
     }
 
     @Override

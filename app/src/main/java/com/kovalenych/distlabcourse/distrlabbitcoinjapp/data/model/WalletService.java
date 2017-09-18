@@ -120,6 +120,7 @@ public enum WalletService {
 
             @Override
             public void onResponse(Response response) throws IOException {
+                utxos.clear();
                 String string = response.body().string();
                 List<UtxoResponse> utxoResponses = Arrays.asList(gson.fromJson(string, UtxoResponse[].class));
                 for (UtxoResponse item : utxoResponses) {
