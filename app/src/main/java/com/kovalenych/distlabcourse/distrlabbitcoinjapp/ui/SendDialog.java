@@ -43,7 +43,12 @@ public class SendDialog extends Dialog {
             public void onClick(View v) {
                 String addressString = addressEditText.getText().toString();
                 String ammountInBtcString = ammountEditText.getText().toString();
-                float ammountInBtc = Float.parseFloat(ammountInBtcString);
+                float ammountInBtc = 0;
+                try {
+                    ammountInBtc = Float.parseFloat(ammountInBtcString);
+                } catch (NumberFormatException ex) {
+                    ammountEditText.setError("Not enough money");
+                }
                 long ammountInSatoshis = (long)(ammountInBtc * SATOCHIS_IN_BTC);
                 try {
                     Address address = new Address(TestNet3Params.get(), addressString);

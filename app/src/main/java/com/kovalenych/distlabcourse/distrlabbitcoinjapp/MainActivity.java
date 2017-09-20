@@ -4,6 +4,7 @@ import android.app.Dialog;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
+import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
@@ -31,7 +32,9 @@ public class MainActivity extends AppCompatActivity {
     private FloatingActionButton sendFab;
     private FloatingActionButton receiveFab;
     private RecyclerView transactionsRecyclerView;
-    private TransactionAdapter adapter = new TransactionAdapter();
+    private TransactionAdapter adapter;
+    private SendDialog sendDialog;
+    private SwipeRefreshLayout swiperefresh;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,20 +51,30 @@ public class MainActivity extends AppCompatActivity {
 
     private void _initViews() {
 
+        swiperefresh = (SwipeRefreshLayout)findViewById(R.id.swiperefresh);
+        swiperefresh.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
+            @Override
+            public void onRefresh() {
+                WalletService.INST.refresh();
+            }
+        });
+
         transactionsRecyclerView = (RecyclerView)findViewById(R.id.transactionsRecyclerView);
         LinearLayoutManager llManager = new LinearLayoutManager(this);
         llManager.setOrientation(LinearLayoutManager.VERTICAL);
         transactionsRecyclerView.setLayoutManager(llManager);
         transactionsRecyclerView.setHasFixedSize(true);
         transactionsRecyclerView.setNestedScrollingEnabled(false);
+
+        adapter = new TransactionAdapter(this);
         transactionsRecyclerView.setAdapter(adapter);
 
         sendFab = (FloatingActionButton)findViewById(R.id.sendFab);
         sendFab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                SendDialog receiveDialog = new SendDialog(MainActivity.this);
-                receiveDialog.show();
+                sendDialog = new SendDialog(MainActivity.this);
+                sendDialog.show();
             }
         });
 
@@ -77,7 +90,18 @@ public class MainActivity extends AppCompatActivity {
 
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onSendCoinsEvent(SendCoinsEvent event) {
+        if (sendDialog != null && sendDialog.isShowing()) {
+            sendDialog.dismiss();
+        }
         Snackbar.make(sendFab, event.isSuccess() ? "Sent " : "Error", Snackbar.LENGTH_LONG).setAction("Details", null).show();
+        transactionsRecyclerView.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (!isFinishing()) {
+                    WalletService.INST.refresh();
+                }
+            }
+        }, 3000); // refreshing balance and transactions
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
@@ -92,6 +116,7 @@ public class MainActivity extends AppCompatActivity {
         EventBus.getDefault().removeStickyEvent(event);
         adapter.setTransactions(WalletService.INST.getTransactions());
         adapter.notifyDataSetChanged();
+        swiperefresh.setRefreshing(false);
     }
 
     @Override

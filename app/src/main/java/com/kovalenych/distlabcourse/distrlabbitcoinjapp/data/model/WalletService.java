@@ -256,4 +256,8 @@ public enum WalletService {
         prefs.edit().putStringSet(ISSUED_ADDRESSES_KEY, issuedAddresses).apply();
         return freshReceiveAddress;
     }
+
+    public Set<String> getIssuedAddresses() {
+        return issuedAddresses;
+    }
 }
