@@ -28,23 +28,23 @@ import static android.content.Context.CLIPBOARD_SERVICE;
 
 public class ReceiveDialog extends Dialog {
 
-    private Address _currentReceiveAddress;
+    private String _currentReceiveAddress;
 
     public ReceiveDialog(final Context context) {
         super(context);
-        _currentReceiveAddress = WalletService.INST.getWallet().freshReceiveAddress();
+        _currentReceiveAddress = WalletService.INST.generateNewAddress();
         setContentView(R.layout.dialog_receive);
 
         ImageView qrCode = (ImageView)findViewById(R.id.qrCode);
-        qrCode.setImageBitmap(createQRBitmap(_currentReceiveAddress.toBase58()));
+        qrCode.setImageBitmap(createQRBitmap(_currentReceiveAddress));
 
         final TextView address = (TextView)findViewById(R.id.address);
-        address.setText(_currentReceiveAddress.toBase58());
+        address.setText(_currentReceiveAddress);
         address.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 ClipboardManager clipboard = (ClipboardManager)context.getSystemService(CLIPBOARD_SERVICE);
-                ClipData clip = ClipData.newPlainText("label", _currentReceiveAddress.toBase58());
+                ClipData clip = ClipData.newPlainText("label", _currentReceiveAddress);
                 clipboard.setPrimaryClip(clip);
                 Snackbar.make(address, "Address copied to clipboard", Snackbar.LENGTH_LONG).show();
             }

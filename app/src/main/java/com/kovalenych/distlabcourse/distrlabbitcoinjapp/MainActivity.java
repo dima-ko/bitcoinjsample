@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
 import android.view.Menu;
@@ -12,9 +13,11 @@ import android.view.MenuItem;
 import android.view.View;
 
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.events.SendCoinsEvent;
+import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.events.TransactionsUpdatedEvent;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.events.WalletUpdatedEvent;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.model.WalletService;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.ui.ReceiveDialog;
+import com.kovalenych.distlabcourse.distrlabbitcoinjapp.ui.SendDialog;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.ui.TransactionAdapter;
 
 import org.bitcoinj.wallet.Wallet;
@@ -39,22 +42,26 @@ public class MainActivity extends AppCompatActivity {
         getSupportActionBar().setTitle("loading balance...");
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         toolbar.setNavigationIcon(R.drawable.btc_icon);
-        WalletService.INST.start();
-
+        WalletService.INST.start(getApplicationContext());
         _initViews();
     }
 
     private void _initViews() {
 
         transactionsRecyclerView = (RecyclerView)findViewById(R.id.transactionsRecyclerView);
-
+        LinearLayoutManager llManager = new LinearLayoutManager(this);
+        llManager.setOrientation(LinearLayoutManager.VERTICAL);
+        transactionsRecyclerView.setLayoutManager(llManager);
+        transactionsRecyclerView.setHasFixedSize(true);
+        transactionsRecyclerView.setNestedScrollingEnabled(false);
         transactionsRecyclerView.setAdapter(adapter);
 
         sendFab = (FloatingActionButton)findViewById(R.id.sendFab);
         sendFab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                WalletService.INST.sendCoins();
+                SendDialog receiveDialog = new SendDialog(MainActivity.this);
+                receiveDialog.show();
             }
         });
 
@@ -75,14 +82,23 @@ public class MainActivity extends AppCompatActivity {
 
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onWalletUpdatedEvent(WalletUpdatedEvent event) {
+        EventBus.getDefault().removeStickyEvent(event);
         Wallet wallet = WalletService.INST.getWallet();
         getSupportActionBar().setTitle(wallet.getBalance().toFriendlyString());
+    }
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onTransactionsUpdatedEvent(TransactionsUpdatedEvent event) {
+        EventBus.getDefault().removeStickyEvent(event);
+        adapter.setTransactions(WalletService.INST.getTransactions());
+        adapter.notifyDataSetChanged();
     }
 
     @Override
     public void onStart() {
         super.onStart();
         EventBus.getDefault().register(this);
+        WalletService.INST.refresh();
     }
 
     @Override

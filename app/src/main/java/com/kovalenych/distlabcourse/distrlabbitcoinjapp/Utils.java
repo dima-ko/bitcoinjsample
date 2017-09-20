@@ -2,6 +2,7 @@ package com.kovalenych.distlabcourse.distrlabbitcoinjapp;
 
 import org.bitcoinj.core.Address;
 
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -22,10 +23,10 @@ public class Utils {
         return data;
     }
 
-    public static String concatWithCommas(List<Address> addresses) {
+    public static String concatWithCommas(Collection<String> addresses) {
         StringBuilder result = new StringBuilder();
-        for (Address address : addresses) {
-            result.append(address.toBase58());
+        for (String address : addresses) {
+            result.append(address);
             result.append(",");
         }
         return result.length() > 0 ? result.substring(0, result.length() - 1) : "";

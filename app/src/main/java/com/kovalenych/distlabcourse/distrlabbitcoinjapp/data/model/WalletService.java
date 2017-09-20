@@ -1,11 +1,17 @@
 package com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.model;
 
+import android.content.Context;
+import android.content.SharedPreferences;
+
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.Utils;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.entity.BlockCountResponse;
+import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.entity.Transaction;
+import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.entity.TransactionsResponse;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.entity.UtxoResponse;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.events.SendCoinsEvent;
+import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.events.TransactionsUpdatedEvent;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.events.WalletUpdatedEvent;
 import com.squareup.okhttp.Callback;
 import com.squareup.okhttp.MediaType;
@@ -33,7 +39,9 @@ import org.greenrobot.eventbus.EventBus;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Created by Dima Kovalenko on 9/18/17.
@@ -46,20 +54,24 @@ public enum WalletService {
 
     public static final String SEED = "jump craft then hair duck wealth shock wage inmate rabbit execute spider";
     public static final Address MY_ADDRESS = Address.fromBase58(TestNet3Params.get(), "mtt9qQ9x7y1avuBAPGgakFRsS7v5KmuJVg");
-    public static final Address FAUCET_ADDRESS = Address.fromBase58(TestNet3Params.get(), "mwCwTceJvYV27KXBc3NJZys6CjsgsoeHmf");
+    public static final String FAUCET_ADDRESS_STRING = "mwCwTceJvYV27KXBc3NJZys6CjsgsoeHmf";
+    public static final Address FAUCET_ADDRESS = Address.fromBase58(TestNet3Params.get(), FAUCET_ADDRESS_STRING);
     public static final int APPROXIMATE_COMMISSION = 10000;
+    public static final String ISSUED_ADDRESSES_KEY = "issuedAddresses";
 
     private int blockcount;
     private OkHttpClient client;
     private Gson gson;
     private Wallet wallet;
     private ArrayList<UTXO> utxos = new ArrayList<>();
+    private List<Transaction> transactions = new ArrayList<>();
+    private Set<String> issuedAddresses = new HashSet<>();
+    private SharedPreferences prefs;
 
     WalletService() {
 
         gson = new GsonBuilder().create();
         client = new OkHttpClient();
-
         DeterministicSeed seed;
         try {
             seed = new DeterministicSeed(SEED, null, "", 0);
@@ -70,13 +82,18 @@ public enum WalletService {
         wallet = Wallet.fromSeed(TestNet3Params.get(), seed);
     }
 
-    public void start() {
-        getBlockChainHeightAndProceed();
-        Address address = wallet.currentReceiveAddress();
+    public void start(Context context) {
+        prefs = context.getSharedPreferences("AddressesPrefs", Context.MODE_PRIVATE);
+        issuedAddresses = prefs.getStringSet(ISSUED_ADDRESSES_KEY, new HashSet<String>());
+        for (String addressString : issuedAddresses) {
+            wallet.addWatchedAddress(Address.fromBase58(TestNet3Params.get(), addressString));
+        }
+    }
 
-        ArrayList<Address> addresses = new ArrayList<>();
-        addresses.add(address);
-        loadUtxos(addresses);
+    public void refresh() {
+        getBlockChainHeightAndProceed();
+        loadUtxos();
+        loadTransactions();
     }
 
     public void getBlockChainHeightAndProceed() {
@@ -102,9 +119,12 @@ public enum WalletService {
                 });
     }
 
-    public void loadUtxos(List<Address> addresses) {
-
-        String addressesJoined = Utils.concatWithCommas(addresses);
+    public void loadUtxos() {
+        if (issuedAddresses.size() == 0) {
+            EventBus.getDefault().postSticky(new WalletUpdatedEvent());
+            return;
+        }
+        String addressesJoined = Utils.concatWithCommas(issuedAddresses);
         utxos.clear();
         Request request = new Request.Builder()
                 .url("https://testnet.blockexplorer.com/api/addr/" + addressesJoined + "/utxo")
@@ -138,6 +158,33 @@ public enum WalletService {
         });
     }
 
+    public void loadTransactions() {
+        if (issuedAddresses.size() == 0) {
+            EventBus.getDefault().postSticky(new WalletUpdatedEvent());
+            return;
+        }
+        String addressesJoined = Utils.concatWithCommas(issuedAddresses);
+        transactions.clear();
+        Request request = new Request.Builder()
+                .url("https://testnet.blockexplorer.com/api/addrs/" + addressesJoined + "/txs?from=0&to=20")
+                .build();
+
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Request request, IOException e) {
+
+            }
+
+            @Override
+            public void onResponse(Response response) throws IOException {
+                String string = response.body().string();
+                TransactionsResponse transactionsResponse = gson.fromJson(string, TransactionsResponse.class);
+                transactions = transactionsResponse.getTransactions();
+                EventBus.getDefault().postSticky(new TransactionsUpdatedEvent());
+            }
+        });
+    }
+
     public void setupUtxoProvider() {
 
         wallet.setUTXOProvider(new UTXOProvider() {
@@ -156,22 +203,15 @@ public enum WalletService {
                 return TestNet3Params.get();
             }
         });
-        EventBus.getDefault().post(new WalletUpdatedEvent());
+        EventBus.getDefault().postSticky(new WalletUpdatedEvent());
     }
 
-
     // Sending coins
-
-    public void sendCoins() {
-        SendRequest sendRequest = SendRequest.to(FAUCET_ADDRESS, Coin.valueOf(130000000 - APPROXIMATE_COMMISSION));
+    public void sendCoins(Address address, long satoshis) throws InsufficientMoneyException {
+        SendRequest sendRequest = SendRequest.to(address, Coin.valueOf(satoshis - APPROXIMATE_COMMISSION));
         sendRequest.feePerKb = Coin.valueOf(10000);
         sendRequest.ensureMinRequiredFee = true;
-        try {
-            wallet.completeTx(sendRequest);
-        } catch (InsufficientMoneyException e) {
-            e.printStackTrace();
-            return;
-        }
+        wallet.completeTx(sendRequest);
         wallet.signTransaction(sendRequest);
         _broadcastTransaction(sendRequest);
     }
@@ -194,9 +234,6 @@ public enum WalletService {
             @Override
             public void onResponse(Response response) throws IOException {
                 EventBus.getDefault().post(new SendCoinsEvent(response.isSuccessful(), response, null));
-                if (response.isSuccessful()) {
-//                    wallet.saveToFile();
-                }
             }
 
         };
@@ -206,5 +243,17 @@ public enum WalletService {
 
     public Wallet getWallet() {
         return wallet;
+    }
+
+    public List<Transaction> getTransactions() {
+        return transactions;
+    }
+
+    public String generateNewAddress() {
+        String freshReceiveAddress = wallet.freshReceiveAddress().toBase58();
+        issuedAddresses.add(freshReceiveAddress);
+        wallet.addWatchedAddress(Address.fromBase58(TestNet3Params.get(), freshReceiveAddress));
+        prefs.edit().putStringSet(ISSUED_ADDRESSES_KEY, issuedAddresses).apply();
+        return freshReceiveAddress;
     }
 }
