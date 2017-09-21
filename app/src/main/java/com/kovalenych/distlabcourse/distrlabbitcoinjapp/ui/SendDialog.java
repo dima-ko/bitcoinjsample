@@ -32,13 +32,14 @@ public class SendDialog extends Dialog {
         ammountEditText = (EditText)findViewById(R.id.ammountEditText);
         addressEditText = (EditText)findViewById(R.id.addressEditText);
 
-        findViewById(R.id.useFaucetAddress).setOnClickListener(new View.OnClickListener() {
+        findViewById(R.id.addressLabel).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 addressEditText.setText(WalletService.FAUCET_ADDRESS_STRING);
             }
         });
-        findViewById(R.id.sendButton).setOnClickListener(new View.OnClickListener() {
+
+        findViewById(R.id.sendFab).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 String addressString = addressEditText.getText().toString();

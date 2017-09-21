@@ -53,9 +53,7 @@ public enum WalletService {
     public static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 
     public static final String SEED = "jump craft then hair duck wealth shock wage inmate rabbit execute spider";
-    public static final Address MY_ADDRESS = Address.fromBase58(TestNet3Params.get(), "mtt9qQ9x7y1avuBAPGgakFRsS7v5KmuJVg");
     public static final String FAUCET_ADDRESS_STRING = "mwCwTceJvYV27KXBc3NJZys6CjsgsoeHmf";
-    public static final Address FAUCET_ADDRESS = Address.fromBase58(TestNet3Params.get(), FAUCET_ADDRESS_STRING);
     public static final int APPROXIMATE_COMMISSION = 10000;
     public static final String ISSUED_ADDRESSES_KEY = "issuedAddresses";
 
