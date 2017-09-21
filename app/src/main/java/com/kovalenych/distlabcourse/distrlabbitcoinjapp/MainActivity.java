@@ -17,6 +17,7 @@ import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.events.SendCoinsEve
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.events.TransactionsUpdatedEvent;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.events.WalletUpdatedEvent;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.model.WalletService;
+import com.kovalenych.distlabcourse.distrlabbitcoinjapp.ui.MnemonicDialog;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.ui.ReceiveDialog;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.ui.SendDialog;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.ui.TransactionAdapter;
@@ -147,7 +148,9 @@ public class MainActivity extends AppCompatActivity {
         int id = item.getItemId();
 
         //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
+        if (id == R.id.mnemonic_phrase) {
+            MnemonicDialog dialog = new MnemonicDialog(this);
+            dialog.show();
             return true;
         }
 

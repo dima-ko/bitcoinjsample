@@ -3,8 +3,8 @@
     xmlns:tools="http://schemas.android.com/tools"
     tools:context="com.kovalenych.distlabcourse.distrlabbitcoinjapp.MainActivity">
     <item
-        android:id="@+id/action_settings"
+        android:id="@+id/mnemonic_phrase"
         android:orderInCategory="100"
-        android:title="@string/action_settings"
+        android:title="@string/mnemonic_phrase"
         app:showAsAction="never" />
 </menu>
