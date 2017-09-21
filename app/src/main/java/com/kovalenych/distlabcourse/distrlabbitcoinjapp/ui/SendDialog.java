@@ -2,17 +2,25 @@ package com.kovalenych.distlabcourse.distrlabbitcoinjapp.ui;
 
 import android.app.Dialog;
 import android.content.Context;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.View;
+import android.widget.ArrayAdapter;
 import android.widget.EditText;
+import android.widget.Spinner;
 
-import com.google.common.math.LongMath;
+import com.kovalenych.distlabcourse.distrlabbitcoinjapp.Constants;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.R;
+import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.entity.FeeResponse;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.model.WalletService;
 
 import org.bitcoinj.core.Address;
 import org.bitcoinj.core.AddressFormatException;
 import org.bitcoinj.core.InsufficientMoneyException;
 import org.bitcoinj.params.TestNet3Params;
+import org.bitcoinj.wallet.Wallet;
+
+import static com.kovalenych.distlabcourse.distrlabbitcoinjapp.Constants.SATOSHIS_IN_BTC;
 
 /**
  * Created by Dima Kovalenko on 9/18/17.
@@ -20,10 +28,11 @@ import org.bitcoinj.params.TestNet3Params;
 
 public class SendDialog extends Dialog {
 
-    private static final long SATOCHIS_IN_BTC = LongMath.pow(10, 8);
-
+    private final View feeHolder;
     private EditText ammountEditText;
     private EditText addressEditText;
+    private Spinner feeSpinner;
+    private int approxTxSize;
 
     public SendDialog(final Context context) {
         super(context);
@@ -31,11 +40,16 @@ public class SendDialog extends Dialog {
 
         ammountEditText = (EditText)findViewById(R.id.ammountEditText);
         addressEditText = (EditText)findViewById(R.id.addressEditText);
+        feeHolder = findViewById(R.id.feeHolder);
+        feeHolder.setVisibility(View.GONE);
+
+        feeSpinner = (Spinner)findViewById(R.id.feeSpinner);
+        setupFeesSpinner();
 
         findViewById(R.id.addressLabel).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                addressEditText.setText(WalletService.FAUCET_ADDRESS_STRING);
+                addressEditText.setText(Constants.FAUCET_ADDRESS_STRING);
             }
         });
 
@@ -50,19 +64,75 @@ public class SendDialog extends Dialog {
                 } catch (NumberFormatException ex) {
                     ammountEditText.setError("Not enough money");
                 }
-                long ammountInSatoshis = (long)(ammountInBtc * SATOCHIS_IN_BTC);
+                long ammountInSt = (long)(ammountInBtc * SATOSHIS_IN_BTC);
                 try {
                     Address address = new Address(TestNet3Params.get(), addressString);
-                    WalletService.INST.sendCoins(address, ammountInSatoshis);
+                    long feeSPerByte = _getFeeFromSpinner();
+                    long fee = feeSPerByte * approxTxSize;
+                    WalletService.INST.sendCoins(address, ammountInSt - fee, feeSPerByte);
                 } catch (AddressFormatException ex) {
                     addressEditText.setError("Wrong address format");
-                } catch (InsufficientMoneyException ex) {
+                } catch (InsufficientMoneyException | Wallet.DustySendRequested ex) {
                     ammountEditText.setError("Not enough money");
                 }
+            }
+        });
+
+        ammountEditText.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                setupFeesSpinner();
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
 
             }
         });
 
+    }
+
+    private void setupFeesSpinner() {
+        float ammountInBtc = 0;
+        try {
+            String ammountInBtcString = ammountEditText.getText().toString();
+            ammountInBtc = Float.parseFloat(ammountInBtcString);
+        } catch (NumberFormatException ex) {
+            feeHolder.setVisibility(View.GONE);
+            return;
+        }
+        long ammountInSatoshis = (long)(ammountInBtc * SATOSHIS_IN_BTC);
+        // address doesn't matter, we just calculating size of transaction
+        Address address = new Address(TestNet3Params.get(), Constants.FAUCET_ADDRESS_STRING);
+        byte[] transactionBytes = new byte[0];
+        try {
+            transactionBytes = WalletService.INST.getTransactionBytes(address, ammountInSatoshis, 0);
+        } catch (InsufficientMoneyException | Wallet.DustySendRequested e) {
+            return; // do nothing
+        }
+        approxTxSize = transactionBytes.length;
+        FeeResponse fees = WalletService.INST.getFees();
+        String fastest = fees.getFastestFee() * approxTxSize + " satoshi (ASAP)";
+        String halfHour = fees.getHalfHourFee() * approxTxSize + " satoshi (half hour)";
+        String hour = fees.getHourFee() * approxTxSize + " satoshi (hour)";
+        String[] items = new String[]{fastest, halfHour, hour};
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(getContext(), android.R.layout.simple_spinner_dropdown_item, items);
+        feeSpinner.setAdapter(adapter);
+        feeHolder.setVisibility(View.VISIBLE);
+    }
+
+    private long _getFeeFromSpinner() {
+        if (feeSpinner.getSelectedItemPosition() == 0) {
+            return WalletService.INST.getFees().getFastestFee();
+        } else if (feeSpinner.getSelectedItemPosition() == 1) {
+            return WalletService.INST.getFees().getHalfHourFee();
+        }
+        return WalletService.INST.getFees().getHourFee();
     }
 
 

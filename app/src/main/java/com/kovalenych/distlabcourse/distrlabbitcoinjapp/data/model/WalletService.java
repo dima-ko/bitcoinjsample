@@ -7,6 +7,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.Utils;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.entity.BlockCountResponse;
+import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.entity.FeeResponse;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.entity.Transaction;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.entity.TransactionsResponse;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.entity.UtxoResponse;
@@ -43,6 +44,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import static com.kovalenych.distlabcourse.distrlabbitcoinjapp.Constants.SEED;
+
 /**
  * Created by Dima Kovalenko on 9/18/17.
  */
@@ -52,9 +55,6 @@ public enum WalletService {
 
     public static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 
-    public static final String SEED = "jump craft then hair duck wealth shock wage inmate rabbit execute spider";
-    public static final String FAUCET_ADDRESS_STRING = "mwCwTceJvYV27KXBc3NJZys6CjsgsoeHmf";
-    public static final int APPROXIMATE_COMMISSION = 10000;
     public static final String ISSUED_ADDRESSES_KEY = "issuedAddresses";
 
     private int blockcount;
@@ -65,6 +65,7 @@ public enum WalletService {
     private List<Transaction> transactions = new ArrayList<>();
     private Set<String> issuedAddresses = new HashSet<>();
     private SharedPreferences prefs;
+    private FeeResponse feeResponse;
 
     WalletService() {
 
@@ -89,12 +90,13 @@ public enum WalletService {
     }
 
     public void refresh() {
+        getRecommendedFees();
         getBlockChainHeightAndProceed();
         loadUtxos();
         loadTransactions();
     }
 
-    public void getBlockChainHeightAndProceed() {
+    private void getBlockChainHeightAndProceed() {
         Request request = new Request.Builder()
                 .url("https://testnet.blockexplorer.com/api/status?q=getBlockCount")
                 .build();
@@ -117,7 +119,29 @@ public enum WalletService {
                 });
     }
 
-    public void loadUtxos() {
+    private void getRecommendedFees() {
+        Request request = new Request.Builder()
+                .url("https://bitcoinfees.21.co/api/v1/fees/recommended")
+                .build();
+        // Get a handler that can be used to post to the main thread
+        client.newCall(request).enqueue(
+                new Callback() {
+                    @Override
+                    public void onFailure(Request request, IOException e) {
+                    }
+
+                    @Override
+                    public void onResponse(Response response) throws IOException {
+                        if (!response.isSuccessful()) {
+                        } else {
+                            feeResponse = gson.fromJson(response.body().string(), FeeResponse.class);
+                        }
+                    }
+
+                });
+    }
+
+    private void loadUtxos() {
         if (issuedAddresses.size() == 0) {
             EventBus.getDefault().postSticky(new WalletUpdatedEvent());
             return;
@@ -156,7 +180,7 @@ public enum WalletService {
         });
     }
 
-    public void loadTransactions() {
+    private void loadTransactions() {
         if (issuedAddresses.size() == 0) {
             EventBus.getDefault().postSticky(new WalletUpdatedEvent());
             return;
@@ -205,18 +229,22 @@ public enum WalletService {
     }
 
     // Sending coins
-    public void sendCoins(Address address, long satoshis) throws InsufficientMoneyException {
-        SendRequest sendRequest = SendRequest.to(address, Coin.valueOf(satoshis - APPROXIMATE_COMMISSION));
-        sendRequest.feePerKb = Coin.valueOf(10000);
+    public void sendCoins(Address address, long ammountSt, long feeStPerByte) throws InsufficientMoneyException, Wallet.DustySendRequested {
+        byte[] transactionBytes = getTransactionBytes(address, ammountSt, feeStPerByte);
+        broadcastTransaction(transactionBytes);
+    }
+
+    public byte[] getTransactionBytes(Address address, long satoshis, long feeSatoshiPerByte) throws InsufficientMoneyException, Wallet.DustySendRequested {
+        SendRequest sendRequest = SendRequest.to(address, Coin.valueOf(satoshis));
+        sendRequest.feePerKb = Coin.valueOf(feeSatoshiPerByte);
         sendRequest.ensureMinRequiredFee = true;
         wallet.completeTx(sendRequest);
         wallet.signTransaction(sendRequest);
-        _broadcastTransaction(sendRequest);
+        return sendRequest.tx.unsafeBitcoinSerialize();
     }
 
-    private void _broadcastTransaction(SendRequest sendRequest) {
-        byte bytes[] = sendRequest.tx.unsafeBitcoinSerialize();
-        RequestBody body = RequestBody.create(JSON, "{\"rawtx\": \"" + Utils.bytesToHex(bytes) + "\"}");
+    private void broadcastTransaction(byte[] transactionBytes) {
+        RequestBody body = RequestBody.create(JSON, "{\"rawtx\": \"" + Utils.bytesToHex(transactionBytes) + "\"}");
         final Request request = new Request.Builder()
                 .method("POST", body)
                 .url("https://testnet.blockexplorer.com/api/tx/send")
@@ -257,5 +285,9 @@ public enum WalletService {
 
     public Set<String> getIssuedAddresses() {
         return issuedAddresses;
+    }
+
+    public FeeResponse getFees() {
+        return feeResponse;
     }
 }

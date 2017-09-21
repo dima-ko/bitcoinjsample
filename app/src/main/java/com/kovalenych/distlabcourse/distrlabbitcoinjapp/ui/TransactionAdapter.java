@@ -52,7 +52,9 @@ public class TransactionAdapter extends RecyclerView.Adapter<TransactionAdapter.
         if (confirmations == 0) {
             holder.confirmations.setText("Unconfirmed");
             holder.confirmations.setTextColor(Color.RED);
-            holder.cancelButton.setVisibility(View.VISIBLE);
+            if (ammount < 0) { // we can cancel only OUR transaction
+                holder.cancelButton.setVisibility(View.VISIBLE);
+            }
         } else {
             holder.confirmations.setText("Confirmations: " + confirmations);
             holder.cancelButton.setVisibility(View.GONE);
