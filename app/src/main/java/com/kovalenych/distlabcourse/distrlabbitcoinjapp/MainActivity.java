@@ -1,6 +1,9 @@
 package com.kovalenych.distlabcourse.distrlabbitcoinjapp;
 
 import android.app.Dialog;
+import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
@@ -31,7 +34,6 @@ import org.greenrobot.eventbus.ThreadMode;
 public class MainActivity extends AppCompatActivity {
 
     private FloatingActionButton sendFab;
-    private FloatingActionButton receiveFab;
     private RecyclerView transactionsRecyclerView;
     private TransactionAdapter adapter;
     private SendDialog sendDialog;
@@ -79,7 +81,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        receiveFab = (FloatingActionButton)findViewById(R.id.receiveFab);
+        FloatingActionButton receiveFab = (FloatingActionButton)findViewById(R.id.receiveFab);
         receiveFab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -124,7 +126,11 @@ public class MainActivity extends AppCompatActivity {
     public void onStart() {
         super.onStart();
         EventBus.getDefault().register(this);
-        WalletService.INST.refresh();
+        if (isNetworkAvailable()) {
+            WalletService.INST.refresh();
+        } else {
+            getSupportActionBar().setTitle("No connection...");
+        }
     }
 
     @Override
@@ -156,4 +162,17 @@ public class MainActivity extends AppCompatActivity {
 
         return super.onOptionsItemSelected(item);
     }
+
+    private boolean isNetworkAvailable() {
+        ConnectivityManager manager =
+                (ConnectivityManager)getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo networkInfo = manager.getActiveNetworkInfo();
+        boolean isAvailable = false;
+        if (networkInfo != null && networkInfo.isConnected()) {
+            // Network is present and connected
+            isAvailable = true;
+        }
+        return isAvailable;
+    }
+
 }

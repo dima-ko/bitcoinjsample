@@ -8,6 +8,7 @@ import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.Spinner;
+import android.widget.TextView;
 
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.Constants;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.R;
@@ -29,6 +30,7 @@ import static com.kovalenych.distlabcourse.distrlabbitcoinjapp.Constants.SATOSHI
 public class SendDialog extends Dialog {
 
     private final View feeHolder;
+    private final TextView ammountErrorView;
     private EditText ammountEditText;
     private EditText addressEditText;
     private Spinner feeSpinner;
@@ -40,6 +42,7 @@ public class SendDialog extends Dialog {
 
         ammountEditText = (EditText)findViewById(R.id.ammountEditText);
         addressEditText = (EditText)findViewById(R.id.addressEditText);
+        ammountErrorView = (TextView)findViewById(R.id.ammountErrorView);
         feeHolder = findViewById(R.id.feeHolder);
         feeHolder.setVisibility(View.GONE);
 
@@ -105,6 +108,14 @@ public class SendDialog extends Dialog {
         } catch (NumberFormatException ex) {
             feeHolder.setVisibility(View.GONE);
             return;
+        }
+        Wallet wallet = WalletService.INST.getWallet();
+        if (ammountInBtc * Constants.SATOSHIS_IN_BTC >= wallet.getBalance().getValue()) {
+            ammountErrorView.setVisibility(View.VISIBLE);
+            String balanceInBtc = wallet.getBalance().toFriendlyString();
+            ammountErrorView.setText(getContext().getResources().getString(R.string.not_enough_money_on_balance, balanceInBtc));
+        } else {
+            ammountErrorView.setVisibility(View.GONE);
         }
         long ammountInSatoshis = (long)(ammountInBtc * SATOSHIS_IN_BTC);
         // address doesn't matter, we just calculating size of transaction
