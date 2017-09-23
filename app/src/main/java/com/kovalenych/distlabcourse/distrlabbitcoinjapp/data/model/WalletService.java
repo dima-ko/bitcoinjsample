@@ -26,11 +26,16 @@ import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.InsufficientMoneyException;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.core.Sha256Hash;
+import org.bitcoinj.core.TransactionConfidence;
+import org.bitcoinj.core.TransactionInput;
+import org.bitcoinj.core.TransactionOutput;
 import org.bitcoinj.core.UTXO;
 import org.bitcoinj.core.UTXOProvider;
 import org.bitcoinj.core.UTXOProviderException;
 import org.bitcoinj.params.TestNet3Params;
 import org.bitcoinj.script.Script;
+import org.bitcoinj.wallet.CoinSelection;
+import org.bitcoinj.wallet.CoinSelector;
 import org.bitcoinj.wallet.DeterministicSeed;
 import org.bitcoinj.wallet.SendRequest;
 import org.bitcoinj.wallet.UnreadableWalletException;
@@ -44,6 +49,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 import static com.kovalenych.distlabcourse.distrlabbitcoinjapp.Constants.SEED;
 
 /**
@@ -60,12 +67,13 @@ public enum WalletService {
     private int blockcount;
     private OkHttpClient client;
     private Gson gson;
-    private Wallet wallet;
+    private WalletWrapper wallet;
     private ArrayList<UTXO> utxos = new ArrayList<>();
     private List<Transaction> transactions = new ArrayList<>();
     private Set<String> issuedAddresses = new HashSet<>();
     private SharedPreferences prefs;
     private FeeResponse feeResponse;
+    private org.bitcoinj.core.Transaction pendingTx;
 
     WalletService() {
 
@@ -78,7 +86,7 @@ public enum WalletService {
             e.printStackTrace();
             return;
         }
-        wallet = Wallet.fromSeed(TestNet3Params.get(), seed);
+        wallet = WalletWrapper.fromSeed(TestNet3Params.get(), seed);
     }
 
     public void start(Context context) {
@@ -240,6 +248,7 @@ public enum WalletService {
         sendRequest.ensureMinRequiredFee = true;
         wallet.completeTx(sendRequest);
         wallet.signTransaction(sendRequest);
+        pendingTx = sendRequest.tx;
         return sendRequest.tx.unsafeBitcoinSerialize();
     }
 
