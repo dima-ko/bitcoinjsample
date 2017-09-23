@@ -22,6 +22,7 @@ import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.events.WalletUpdate
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.model.WalletService;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.ui.MnemonicDialog;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.ui.ReceiveDialog;
+import com.kovalenych.distlabcourse.distrlabbitcoinjapp.ui.RestoreDialog;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.ui.SendDialog;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.ui.TransactionAdapter;
 
@@ -48,8 +49,13 @@ public class MainActivity extends AppCompatActivity {
         getSupportActionBar().setTitle("loading balance...");
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         toolbar.setNavigationIcon(R.drawable.btc_icon);
-        WalletService.INST.start(getApplicationContext());
         _initViews();
+        if (isNetworkAvailable()) {
+            WalletService.INST.start(getApplicationContext());
+        } else {
+            getSupportActionBar().setTitle("No connection...");
+        } // TODO handle reconnect
+
     }
 
     private void _initViews() {
@@ -58,7 +64,7 @@ public class MainActivity extends AppCompatActivity {
         swiperefresh.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
             @Override
             public void onRefresh() {
-                WalletService.INST.refresh();
+                WalletService.INST.refreshForActiveAddresses();
             }
         });
 
@@ -76,6 +82,7 @@ public class MainActivity extends AppCompatActivity {
         sendFab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                WalletService.INST.fetchRecommendedFees();
                 sendDialog = new SendDialog(MainActivity.this);
                 sendDialog.show();
             }
@@ -101,7 +108,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void run() {
                 if (!isFinishing()) {
-                    WalletService.INST.refresh();
+                    WalletService.INST.refreshForActiveAddresses();
                 }
             }
         }, 3000); // refreshing balance and transactions
@@ -126,11 +133,6 @@ public class MainActivity extends AppCompatActivity {
     public void onStart() {
         super.onStart();
         EventBus.getDefault().register(this);
-        if (isNetworkAvailable()) {
-            WalletService.INST.refresh();
-        } else {
-            getSupportActionBar().setTitle("No connection...");
-        }
     }
 
     @Override
@@ -156,6 +158,10 @@ public class MainActivity extends AppCompatActivity {
         //noinspection SimplifiableIfStatement
         if (id == R.id.mnemonic_phrase) {
             MnemonicDialog dialog = new MnemonicDialog(this);
+            dialog.show();
+            return true;
+        } else if (id == R.id.restore_wallet) {
+            RestoreDialog dialog = new RestoreDialog(this);
             dialog.show();
             return true;
         }

@@ -8,9 +8,9 @@ import com.google.common.math.LongMath;
 
 public class Constants {
 
-    public static final long SATOSHIS_IN_BTC = LongMath.pow(10, 8);
+    public static final long SATOSHI_IN_BTC = LongMath.pow(10, 8);
 
-    public static final String SEED = "jump craft then hair duck wealth shock wage inmate rabbit execute spider";
+    public static final String TEST_MNEMONIC_PHRASE = "jump craft then hair duck wealth shock wage inmate rabbit execute spider";
     public static final String FAUCET_ADDRESS_STRING = "mwCwTceJvYV27KXBc3NJZys6CjsgsoeHmf";
 
 }
