@@ -325,7 +325,13 @@ public enum WalletService {
     }
 
     public String generateNewAddress() {
-        String freshReceiveAddress = wallet.freshReceiveAddress().toBase58();
+        String freshReceiveAddress = null;
+        for (String address : addressPool) {
+            if (!activeAddresses.contains(address)) {
+                freshReceiveAddress = address;
+                break;
+            }
+        }
         activeAddresses.add(freshReceiveAddress);
         wallet.addWatchedAddress(Address.fromBase58(TestNet3Params.get(), freshReceiveAddress));
         return freshReceiveAddress;
