@@ -11,6 +11,7 @@ import org.bitcoinj.core.TransactionConfidence;
 import org.bitcoinj.core.TransactionInput;
 import org.bitcoinj.core.TransactionOutput;
 import org.bitcoinj.core.VarInt;
+import org.bitcoinj.params.TestNet3Params;
 import org.bitcoinj.script.Script;
 import org.bitcoinj.wallet.CoinSelection;
 import org.bitcoinj.wallet.CoinSelector;
@@ -34,6 +35,10 @@ import static com.google.common.base.Preconditions.checkState;
  */
 
 public class WalletWrapper extends Wallet {
+
+    public WalletWrapper(TestNet3Params testNet3Params) {
+        super(testNet3Params);
+    }
 
     private static class FeeCalculationImproved {
         public CoinSelection bestCoinSelection;

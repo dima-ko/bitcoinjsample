@@ -36,7 +36,6 @@ import org.bitcoinj.wallet.DeterministicSeed;
 import org.bitcoinj.wallet.KeyChain;
 import org.bitcoinj.wallet.SendRequest;
 import org.bitcoinj.wallet.UnreadableWalletException;
-import org.bitcoinj.wallet.Wallet;
 import org.greenrobot.eventbus.EventBus;
 
 import java.io.IOException;
@@ -59,7 +58,7 @@ public enum WalletService {
     private OkHttpClient client;
     private Gson gson;
 
-    private Wallet wallet;
+    private WalletWrapper wallet;
     private int blockcount;
     private ArrayList<UTXO> utxos = new ArrayList<>();
     private List<Transaction> transactions = new ArrayList<>();
@@ -78,7 +77,7 @@ public enum WalletService {
         String mnemonicPhrase = prefs.getString(MNEMONIC_PHRASE, null);
         if (mnemonicPhrase == null) {
             // creating new wallet from scratch
-            wallet = new Wallet(TestNet3Params.get());
+            wallet = new WalletWrapper(TestNet3Params.get());
             DeterministicSeed keyChainSeed = WalletService.INST.getWallet().getKeyChainSeed();
             mnemonicPhrase = org.bitcoinj.core.Utils.join(keyChainSeed.getMnemonicCode());
             prefs.edit().putString(MNEMONIC_PHRASE, mnemonicPhrase).apply();
@@ -90,7 +89,7 @@ public enum WalletService {
                 // shouldn't happen
                 e.printStackTrace();
             }
-            wallet = Wallet.fromSeed(TestNet3Params.get(), seed);
+            wallet = WalletWrapper.fromSeed(TestNet3Params.get(), seed);
         }
 
         // filling addresses pool, cause KeyChain has stack architecture
@@ -278,12 +277,12 @@ public enum WalletService {
     }
 
     // Sending coins
-    public void sendCoins(Address address, long ammountSt, long feeStPerByte) throws InsufficientMoneyException, Wallet.DustySendRequested {
+    public void sendCoins(Address address, long ammountSt, long feeStPerByte) throws InsufficientMoneyException, WalletWrapper.DustySendRequested {
         byte[] transactionBytes = getTransactionBytes(address, ammountSt, feeStPerByte);
         broadcastTransaction(transactionBytes);
     }
 
-    public byte[] getTransactionBytes(Address address, long satoshis, long feeSatoshiPerByte) throws InsufficientMoneyException, Wallet.DustySendRequested {
+    public byte[] getTransactionBytes(Address address, long satoshis, long feeSatoshiPerByte) throws InsufficientMoneyException, WalletWrapper.DustySendRequested {
         SendRequest sendRequest = SendRequest.to(address, Coin.valueOf(satoshis));
         sendRequest.feePerKb = Coin.valueOf(feeSatoshiPerByte);
         sendRequest.ensureMinRequiredFee = true;
@@ -316,7 +315,7 @@ public enum WalletService {
         client.newCall(request).enqueue(responseCallback);
     }
 
-    public Wallet getWallet() {
+    public WalletWrapper getWallet() {
         return wallet;
     }
 
@@ -343,7 +342,7 @@ public enum WalletService {
         return feeResponse;
     }
 
-    public Wallet restoreFromMnemonic(Context context, String mnemonicPhrase) {
+    public WalletWrapper restoreFromMnemonic(Context context, String mnemonicPhrase) {
         DeterministicSeed seed;
         try {
             seed = new DeterministicSeed(mnemonicPhrase, null, "", 0);
@@ -351,7 +350,7 @@ public enum WalletService {
             e.printStackTrace();
             return null;
         }
-        wallet = Wallet.fromSeed(TestNet3Params.get(), seed);
+        wallet = WalletWrapper.fromSeed(TestNet3Params.get(), seed);
         prefs.edit().putString(MNEMONIC_PHRASE, mnemonicPhrase).apply();
         start(context);
         return wallet;
