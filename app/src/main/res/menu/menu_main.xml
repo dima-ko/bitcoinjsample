@@ -7,4 +7,9 @@
         android:orderInCategory="100"
         android:title="@string/mnemonic_phrase"
         app:showAsAction="never" />
+    <item
+        android:id="@+id/restore_wallet"
+        android:orderInCategory="100"
+        android:title="@string/restore_wallet"
+        app:showAsAction="never" />
 </menu>

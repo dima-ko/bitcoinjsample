@@ -21,7 +21,7 @@ import org.bitcoinj.core.InsufficientMoneyException;
 import org.bitcoinj.params.TestNet3Params;
 import org.bitcoinj.wallet.Wallet;
 
-import static com.kovalenych.distlabcourse.distrlabbitcoinjapp.Constants.SATOSHIS_IN_BTC;
+import static com.kovalenych.distlabcourse.distrlabbitcoinjapp.Constants.SATOSHI_IN_BTC;
 
 /**
  * Created by Dima Kovalenko on 9/18/17.
@@ -67,7 +67,7 @@ public class SendDialog extends Dialog {
                 } catch (NumberFormatException ex) {
                     ammountEditText.setError("Not enough money");
                 }
-                long ammountInSt = (long)(ammountInBtc * SATOSHIS_IN_BTC);
+                long ammountInSt = (long)(ammountInBtc * SATOSHI_IN_BTC);
                 try {
                     Address address = new Address(TestNet3Params.get(), addressString);
                     long feeSPerByte = _getFeeFromSpinner();
@@ -110,14 +110,14 @@ public class SendDialog extends Dialog {
             return;
         }
         Wallet wallet = WalletService.INST.getWallet();
-        if (ammountInBtc * Constants.SATOSHIS_IN_BTC >= wallet.getBalance().getValue()) {
+        if (ammountInBtc * Constants.SATOSHI_IN_BTC >= wallet.getBalance().getValue()) {
             ammountErrorView.setVisibility(View.VISIBLE);
             String balanceInBtc = wallet.getBalance().toFriendlyString();
             ammountErrorView.setText(getContext().getResources().getString(R.string.not_enough_money_on_balance, balanceInBtc));
         } else {
             ammountErrorView.setVisibility(View.GONE);
         }
-        long ammountInSatoshis = (long)(ammountInBtc * SATOSHIS_IN_BTC);
+        long ammountInSatoshis = (long)(ammountInBtc * SATOSHI_IN_BTC);
         // address doesn't matter, we just calculating size of transaction
         Address address = new Address(TestNet3Params.get(), Constants.FAUCET_ADDRESS_STRING);
         byte[] transactionBytes = new byte[0];

@@ -26,17 +26,14 @@ import org.bitcoinj.core.Coin;
 import org.bitcoinj.core.InsufficientMoneyException;
 import org.bitcoinj.core.NetworkParameters;
 import org.bitcoinj.core.Sha256Hash;
-import org.bitcoinj.core.TransactionConfidence;
-import org.bitcoinj.core.TransactionInput;
-import org.bitcoinj.core.TransactionOutput;
 import org.bitcoinj.core.UTXO;
 import org.bitcoinj.core.UTXOProvider;
 import org.bitcoinj.core.UTXOProviderException;
+import org.bitcoinj.crypto.DeterministicKey;
 import org.bitcoinj.params.TestNet3Params;
 import org.bitcoinj.script.Script;
-import org.bitcoinj.wallet.CoinSelection;
-import org.bitcoinj.wallet.CoinSelector;
 import org.bitcoinj.wallet.DeterministicSeed;
+import org.bitcoinj.wallet.KeyChain;
 import org.bitcoinj.wallet.SendRequest;
 import org.bitcoinj.wallet.UnreadableWalletException;
 import org.bitcoinj.wallet.Wallet;
@@ -45,13 +42,7 @@ import org.greenrobot.eventbus.EventBus;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-
-import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkState;
-import static com.kovalenych.distlabcourse.distrlabbitcoinjapp.Constants.SEED;
 
 /**
  * Created by Dima Kovalenko on 9/18/17.
@@ -60,48 +51,68 @@ import static com.kovalenych.distlabcourse.distrlabbitcoinjapp.Constants.SEED;
 public enum WalletService {
     INST;
 
-    public static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+    private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+    private static final String MNEMONIC_PHRASE = "mnemonicPhrase";
+    public static final int TRANSACTIONS_LIMIT = 20;
+    public static final int ADDRESSES_LIMIT = 20;
 
-    public static final String ISSUED_ADDRESSES_KEY = "issuedAddresses";
-
-    private int blockcount;
     private OkHttpClient client;
     private Gson gson;
-    private WalletWrapper wallet;
+
+    private Wallet wallet;
+    private int blockcount;
     private ArrayList<UTXO> utxos = new ArrayList<>();
     private List<Transaction> transactions = new ArrayList<>();
-    private Set<String> issuedAddresses = new HashSet<>();
+    private List<String> activeAddresses = new ArrayList<>(); // used address (that had transactions)
+    private List<String> addressPool = new ArrayList<>(); // first 300 addresses from keychain ??
     private SharedPreferences prefs;
     private FeeResponse feeResponse;
-    private org.bitcoinj.core.Transaction pendingTx;
 
     WalletService() {
-
         gson = new GsonBuilder().create();
         client = new OkHttpClient();
-        DeterministicSeed seed;
-        try {
-            seed = new DeterministicSeed(SEED, null, "", 0);
-        } catch (UnreadableWalletException e) {
-            e.printStackTrace();
-            return;
-        }
-        wallet = WalletWrapper.fromSeed(TestNet3Params.get(), seed);
     }
 
     public void start(Context context) {
-        prefs = context.getSharedPreferences("AddressesPrefs", Context.MODE_PRIVATE);
-        issuedAddresses = prefs.getStringSet(ISSUED_ADDRESSES_KEY, new HashSet<String>());
-        for (String addressString : issuedAddresses) {
-            wallet.addWatchedAddress(Address.fromBase58(TestNet3Params.get(), addressString));
+        prefs = context.getApplicationContext().getSharedPreferences("AddressesPrefs", Context.MODE_PRIVATE);
+        String mnemonicPhrase = prefs.getString(MNEMONIC_PHRASE, null);
+        if (mnemonicPhrase == null) {
+            // creating new wallet from scratch
+            wallet = new Wallet(TestNet3Params.get());
+            DeterministicSeed keyChainSeed = WalletService.INST.getWallet().getKeyChainSeed();
+            mnemonicPhrase = org.bitcoinj.core.Utils.join(keyChainSeed.getMnemonicCode());
+            prefs.edit().putString(MNEMONIC_PHRASE, mnemonicPhrase).apply();
+        } else {
+            DeterministicSeed seed = null;
+            try {
+                seed = new DeterministicSeed(mnemonicPhrase, null, "", 0);
+            } catch (UnreadableWalletException e) {
+                // shouldn't happen
+                e.printStackTrace();
+            }
+            wallet = Wallet.fromSeed(TestNet3Params.get(), seed);
         }
+
+        // filling addresses pool, cause KeyChain has stack architecture
+        List<DeterministicKey> first300Keys = wallet.getActiveKeyChain().getKeys(KeyChain.KeyPurpose.RECEIVE_FUNDS, 300);
+        for (DeterministicKey key : first300Keys) {
+            addressPool.add(key.toAddress(TestNet3Params.get()).toBase58());
+        }
+
+        // load all transactions to get active addresses
+        loadTransactions(0, 0, addressPool);
     }
 
-    public void refresh() {
-        getRecommendedFees();
+    public void refreshForActiveAddresses() {
+        fetchRecommendedFees();
         getBlockChainHeightAndProceed();
+        if (activeAddresses.size() == 0) {
+            EventBus.getDefault().postSticky(new WalletUpdatedEvent());
+            return;
+        }
         loadUtxos();
-        loadTransactions();
+        transactions.clear();
+        loadTransactions(0, 0, activeAddresses);
     }
 
     private void getBlockChainHeightAndProceed() {
@@ -127,7 +138,7 @@ public enum WalletService {
                 });
     }
 
-    private void getRecommendedFees() {
+    public void fetchRecommendedFees() {
         Request request = new Request.Builder()
                 .url("https://bitcoinfees.21.co/api/v1/fees/recommended")
                 .build();
@@ -150,14 +161,14 @@ public enum WalletService {
     }
 
     private void loadUtxos() {
-        if (issuedAddresses.size() == 0) {
+        if (activeAddresses.size() == 0) {
             EventBus.getDefault().postSticky(new WalletUpdatedEvent());
             return;
         }
-        String addressesJoined = Utils.concatWithCommas(issuedAddresses);
+        String addressesJoined = Utils.concatWithCommas(activeAddresses);
         utxos.clear();
         Request request = new Request.Builder()
-                .url("https://testnet.blockexplorer.com/api/addr/" + addressesJoined + "/utxo")
+                .url("https://testnet.blockexplorer.com/api/addr/" + addressesJoined + "/utxo") // TODO make limit
                 .build();
 
         client.newCall(request).enqueue(new Callback() {
@@ -188,15 +199,23 @@ public enum WalletService {
         });
     }
 
-    private void loadTransactions() {
-        if (issuedAddresses.size() == 0) {
-            EventBus.getDefault().postSticky(new WalletUpdatedEvent());
+    /**
+     * Load transactions from API for given list of addresses with transactionsOffset and 20 per page recursively.
+     * Abort when call returns 0 transactions.
+     *
+     * @param transactionsOffset
+     * @param addresses
+     */
+    private void loadTransactions(final int addressesOffset, final int transactionsOffset, final List<String> addresses) {
+        if (addressesOffset >= addresses.size()) {
             return;
         }
-        String addressesJoined = Utils.concatWithCommas(issuedAddresses);
-        transactions.clear();
+        int toIndex = addressesOffset + ADDRESSES_LIMIT < addresses.size() ? addressesOffset + ADDRESSES_LIMIT : addresses.size();
+        List<String> addressesChunk = addresses.subList(addressesOffset, toIndex);
+        String addressesJoined = Utils.concatWithCommas(addressesChunk);
+
         Request request = new Request.Builder()
-                .url("https://testnet.blockexplorer.com/api/addrs/" + addressesJoined + "/txs?from=0&to=20")
+                .url("https://testnet.blockexplorer.com/api/addrs/" + addressesJoined + "/txs?from=" + transactionsOffset + "&to=" + (transactionsOffset + TRANSACTIONS_LIMIT))
                 .build();
 
         client.newCall(request).enqueue(new Callback() {
@@ -209,7 +228,29 @@ public enum WalletService {
             public void onResponse(Response response) throws IOException {
                 String string = response.body().string();
                 TransactionsResponse transactionsResponse = gson.fromJson(string, TransactionsResponse.class);
-                transactions = transactionsResponse.getTransactions();
+                transactions.addAll(transactionsResponse.getTransactions());
+                for (Transaction transaction : transactionsResponse.getTransactions()) {
+                    List<String> myWalletAddresses = transaction.getMyWalletAddresses();
+                    for (String address : myWalletAddresses) {
+                        if (!activeAddresses.contains(address)) {
+                            activeAddresses.add(address);
+                        }
+                    }
+                }
+                if (transactionsResponse.getTransactions().size() == 0) {
+                    if (transactionsOffset == 0) {
+                        // user didn't use this chunk of addresses yet, stop recursion and fetch UTXO's and balance
+                        if (addresses.size() == addressPool.size()) {
+                            refreshForActiveAddresses();
+                        }
+                    } else {
+                        // check next chunk of addresses, getting transactions starting from 0
+                        loadTransactions(addressesOffset + ADDRESSES_LIMIT, 0, addresses);
+                    }
+                } else {
+                    // load next portion of transactions for same addresses chunk
+                    loadTransactions(addressesOffset, transactionsOffset + TRANSACTIONS_LIMIT, addresses);
+                }
                 EventBus.getDefault().postSticky(new TransactionsUpdatedEvent());
             }
         });
@@ -248,7 +289,6 @@ public enum WalletService {
         sendRequest.ensureMinRequiredFee = true;
         wallet.completeTx(sendRequest);
         wallet.signTransaction(sendRequest);
-        pendingTx = sendRequest.tx;
         return sendRequest.tx.unsafeBitcoinSerialize();
     }
 
@@ -286,17 +326,34 @@ public enum WalletService {
 
     public String generateNewAddress() {
         String freshReceiveAddress = wallet.freshReceiveAddress().toBase58();
-        issuedAddresses.add(freshReceiveAddress);
+        activeAddresses.add(freshReceiveAddress);
         wallet.addWatchedAddress(Address.fromBase58(TestNet3Params.get(), freshReceiveAddress));
-        prefs.edit().putStringSet(ISSUED_ADDRESSES_KEY, issuedAddresses).apply();
         return freshReceiveAddress;
     }
 
-    public Set<String> getIssuedAddresses() {
-        return issuedAddresses;
+    public List<String> getActiveAddresses() {
+        return activeAddresses;
+    }
+
+    public List<String> getAddressPool() {
+        return addressPool;
     }
 
     public FeeResponse getFees() {
         return feeResponse;
+    }
+
+    public Wallet restoreFromMnemonic(Context context, String mnemonicPhrase) {
+        DeterministicSeed seed;
+        try {
+            seed = new DeterministicSeed(mnemonicPhrase, null, "", 0);
+        } catch (UnreadableWalletException | IllegalArgumentException e) {
+            e.printStackTrace();
+            return null;
+        }
+        wallet = Wallet.fromSeed(TestNet3Params.get(), seed);
+        prefs.edit().putString(MNEMONIC_PHRASE, mnemonicPhrase).apply();
+        start(context);
+        return wallet;
     }
 }

@@ -3,6 +3,7 @@ package com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.entity;
 import com.google.gson.annotations.SerializedName;
 import com.kovalenych.distlabcourse.distrlabbitcoinjapp.data.model.WalletService;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -40,7 +41,7 @@ public class Transaction {
     }
 
     public float getAmmount() {
-        for (String myWalletAddress : WalletService.INST.getIssuedAddresses()) {
+        for (String myWalletAddress : WalletService.INST.getActiveAddresses()) {
             for (IO input : vin) {
                 if (myWalletAddress.equals(input.getAddr())) {
                     return -input.getValue();
@@ -55,5 +56,23 @@ public class Transaction {
             }
         }
         return 0;
+    }
+
+    public List<String> getMyWalletAddresses() {
+        List<String> addresses = new ArrayList<>();
+        List<String> addressPool = WalletService.INST.getAddressPool();
+        for (IO input : vin) {
+            if (addressPool.contains(input.getAddr())) {
+                addresses.add(input.getAddr());
+            }
+        }
+        for (IO output : vout) {
+            for (String outputAddress : output.getScriptPubKey().getAddresses()) {
+                if (addressPool.contains(outputAddress)) {
+                    addresses.add(outputAddress);
+                }
+            }
+        }
+        return addresses;
     }
 }
