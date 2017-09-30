@@ -92,7 +92,7 @@ public enum WalletService {
             }
             wallet = Wallet.fromSeed(TestNet3Params.get(), seed);
         }
-
+        addressPool.clear();
         // filling addresses pool, cause KeyChain has stack architecture
         List<DeterministicKey> first300Keys = wallet.getActiveKeyChain().getKeys(KeyChain.KeyPurpose.RECEIVE_FUNDS, 300);
         for (DeterministicKey key : first300Keys) {
