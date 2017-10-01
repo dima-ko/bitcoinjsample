@@ -168,7 +168,7 @@ public enum WalletService {
         String addressesJoined = Utils.concatWithCommas(activeAddresses);
         utxos.clear();
         Request request = new Request.Builder()
-                .url("https://testnet.blockexplorer.com/api/addr/" + addressesJoined + "/utxo") // TODO make limit
+                .url("https://testnet.blockexplorer.com/api/addrs/" + addressesJoined + "/utxo") // TODO make limit
                 .build();
 
         client.newCall(request).enqueue(new Callback() {
